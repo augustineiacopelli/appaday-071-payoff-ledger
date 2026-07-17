@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Payoff Ledger &middot; AppADay 071</title>
+<meta name="description" content="Compare loan payoff strategies on one chart, including the option of investing the money instead.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E9EDE3;
+    --paper-bar:#DDE5D6;
+    --rule:#B7C6B0;
+    --rule-soft:#CBD7C4;
+    --margin-rule:#C08A84;
+    --ink:#1B2A38;
+    --ink-soft:#5A6B78;
+    --ink-faint:#8695A0;
+    --card:#F3F6EF;
+    --c1:#17324B;
+    --c2:#A33A2E;
+    --c3:#9A6D18;
+    --c4:#26645E;
+    --c5:#6A3B57;
+    --c6:#4C6B2F;
+    --shadow:0 1px 0 rgba(27,42,56,.10), 0 8px 24px -18px rgba(27,42,56,.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    min-height:100dvh;
+    display:flex;flex-direction:column;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(to bottom,var(--paper) 0 27px,var(--paper-bar) 27px 54px);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,sans-serif;
+    font-size:15px;line-height:1.5;
+  }
+  a{color:inherit}
+  .bar{
+    display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+    padding:12px 18px;
+    border-bottom:1.5px solid var(--rule);
+    background:rgba(243,246,239,.92);
+    position:sticky;top:0;z-index:20;
+    backdrop-filter:saturate(1.2) blur(4px);
+  }
+  .bar .num{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.14em;color:var(--c2)}
+  .bar h1{font-family:'Zilla Slab',Georgia,serif;font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .bar .tag{font-size:12.5px;color:var(--ink-soft);flex:1;min-width:180px}
+  .bar .home{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    text-decoration:none;border-bottom:1.5px solid var(--c2);padding-bottom:1px;color:var(--c2);white-space:nowrap;
+  }
+  .bar .home:hover{background:rgba(163,58,46,.08)}
+
+  main{
+    flex:1;display:grid;gap:18px;padding:18px;align-content:start;
+    grid-template-columns:minmax(300px,360px) minmax(0,1fr);
+  }
+  @media (max-width:900px){ main{grid-template-columns:1fr;padding:12px;gap:12px} }
+
+  .panel{
+    background:var(--card);
+    border:1.5px solid var(--rule);
+    border-radius:3px;
+    box-shadow:var(--shadow);
+  }
+  .panel-hd{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 14px;border-bottom:1.5px solid var(--rule);
+    border-left:3px solid var(--margin-rule);
+  }
+  .panel-hd h2{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);
+  }
+  .col{display:flex;flex-direction:column;gap:18px;min-width:0}
+  @media (max-width:900px){ .col{gap:12px} }
+
+  /* ---------- scenario list ---------- */
+  .scn-list{padding:10px;display:flex;flex-direction:column;gap:8px}
+  .scn{
+    border:1.5px solid var(--rule-soft);border-radius:3px;background:#fff;
+    border-left:5px solid var(--sc,var(--c1));
+  }
+  .scn.on{border-color:var(--ink-faint);border-left-color:var(--sc,var(--c1));box-shadow:0 0 0 1.5px rgba(27,42,56,.12)}
+  .scn-top{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer}
+  .scn-top:hover{background:rgba(27,42,56,.03)}
+  .swatch{width:11px;height:11px;border-radius:2px;background:var(--sc,var(--c1));flex:none}
+  .scn-name{
+    flex:1;min-width:0;font-weight:600;font-size:14px;
+    border:none;background:transparent;color:var(--ink);font-family:inherit;padding:2px 3px;border-radius:2px;
+    text-overflow:ellipsis;
+  }
+  .scn-name:focus{background:#fff;outline:2px solid var(--c1);outline-offset:0}
+  .scn-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);white-space:nowrap}
+  .chev{font-size:11px;color:var(--ink-faint);width:12px;text-align:center}
+  .scn-body{padding:2px 10px 12px;display:none;border-top:1px dashed var(--rule-soft);margin-top:2px}
+  .scn.open .scn-body{display:block}
+
+  .fld{display:flex;flex-direction:column;gap:3px;margin-top:10px;min-width:0}
+  .fld label{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-soft);
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input[type=number],input[type=text],select{
+    font-family:'IBM Plex Mono',monospace;font-size:14px;
+    padding:6px 8px;border:1.5px solid var(--rule);border-radius:2px;background:#fff;color:var(--ink);
+    width:100%;min-width:0;
+  }
+  input:focus,select:focus{outline:2px solid var(--c1);outline-offset:-1px;border-color:var(--c1)}
+  input[type=range]{width:100%;accent-color:var(--c2)}
+  .slid{display:flex;align-items:center;gap:8px}
+  .slid .val{font-family:'IBM Plex Mono',monospace;font-size:13px;min-width:74px;text-align:right}
+
+  .btn{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:6px 10px;border:1.5px solid var(--ink);border-radius:2px;background:transparent;color:var(--ink);
+    cursor:pointer;font-weight:600;
+  }
+  .btn:hover{background:var(--ink);color:var(--card)}
+  .btn:focus-visible{outline:2px solid var(--c2);outline-offset:2px}
+  .btn.ghost{border-color:var(--rule);color:var(--ink-soft)}
+  .btn.ghost:hover{background:var(--rule);color:var(--ink)}
+  .btn.danger{border-color:var(--c2);color:var(--c2)}
+  .btn.danger:hover{background:var(--c2);color:#fff}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .scn-acts{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .add-row{padding:0 10px 12px;display:flex;gap:6px}
+  .add-row .btn{flex:1}
+
+  .warn{
+    margin-top:8px;font-size:12px;color:var(--c2);font-weight:500;
+    border-left:3px solid var(--c2);padding-left:7px;display:none;
+  }
+  .warn.on{display:block}
+
+  /* ---------- chart ---------- */
+  .views{display:flex;gap:0;flex-wrap:wrap;border-bottom:1.5px solid var(--rule)}
+  .view-tab{
+    flex:1;min-width:118px;
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+    padding:9px 6px;background:transparent;border:none;border-right:1px solid var(--rule-soft);
+    border-bottom:3px solid transparent;color:var(--ink-soft);cursor:pointer;font-weight:600;
+  }
+  .view-tab:last-child{border-right:none}
+  .view-tab:hover{background:rgba(27,42,56,.04);color:var(--ink)}
+  .view-tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--c2);background:rgba(163,58,46,.05)}
+  .view-tab:focus-visible{outline:2px solid var(--c1);outline-offset:-2px}
+
+  .chart-wrap{padding:12px 12px 0}
+  svg#chart{width:100%;height:auto;display:block;touch-action:pan-y}
+  .focus-row{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:9px 14px;border-top:1px dashed var(--rule-soft);
+  }
+  .focus-row .lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .focus-row select{width:auto;min-width:150px;font-size:13px}
+  .readout{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);
+    padding:8px 14px 12px;min-height:34px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  }
+  .readout b{color:var(--ink);font-weight:600}
+  .readout .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+
+  .note{
+    font-size:12px;color:var(--ink-soft);line-height:1.55;padding:12px 14px;border-top:1px dashed var(--rule-soft);
+  }
+
+  /* ---------- ledger table ---------- */
+  .tbl-scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-family:'IBM Plex Mono',monospace;font-size:13px;min-width:560px}
+  th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+  th{
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:600;border-bottom:1.5px solid var(--rule);
+  }
+  th:first-child,td:first-child{text-align:left;border-right:1px solid var(--margin-rule)}
+  tbody tr:nth-child(odd){background:rgba(214,226,208,.35)}
+  td.name{font-family:'IBM Plex Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:7px}
+  td.delta.good{color:var(--c6);font-weight:600}
+  td.delta.bad{color:var(--c2);font-weight:600}
+  td.base{color:var(--ink-faint)}
+  .foot{
+    padding:14px 18px;border-top:1.5px solid var(--rule);
+    font-size:12px;color:var(--ink-soft);text-align:center;
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .scn-body{animation:fade .18s ease-out}
+    @keyframes fade{from{opacity:0}to{opacity:1}}
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <span class="num">071</span>
+  <h1>Payoff Ledger</h1>
+  <span class="tag">Compare loan payoff strategies on one chart &mdash; including investing the money instead.</span>
+  <a class="home" href="https://augustineiacopelli.github.io/appaday/">AppADay</a>
+</header>
+
+<main>
+  <div class="col">
+    <section class="panel">
+      <div class="panel-hd"><h2>Scenarios</h2><span class="scn-sub" id="scnCount"></span></div>
+      <div class="scn-list" id="scnList"></div>
+      <div class="add-row">
+        <button class="btn" id="addBtn">Add scenario</button>
+        <button class="btn ghost" id="resetBtn">Reset all</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-hd"><h2>Assumptions</h2></div>
+      <div style="padding:12px 14px 16px">
+        <div class="fld" style="margin-top:0">
+          <label for="retInput">Assumed annual investment return</label>
+          <div class="slid">
+            <input type="range" id="retInput" min="0" max="15" step="0.25" value="7">
+            <span class="val" id="retVal">7.00%</span>
+          </div>
+        </div>
+        <p class="note" style="padding:12px 0 0;border:none">
+          Used only by the Pay down vs. invest view. Returns are treated as a steady geometric rate,
+          which no real market delivers. Taxes, deductions, and fees are ignored.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel">
+      <div class="views" role="tablist" aria-label="Chart view">
+        <button class="view-tab" role="tab" data-view="balance" aria-selected="true">Balance</button>
+        <button class="view-tab" role="tab" data-view="interest" aria-selected="false">Interest paid</button>
+        <button class="view-tab" role="tab" data-view="split" aria-selected="false">Payment split</button>
+        <button class="view-tab" role="tab" data-view="invest" aria-selected="false">Pay down vs. invest</button>
+      </div>
+      <div class="focus-row" id="focusRow" hidden>
+        <span class="lbl">Scenario shown</span>
+        <select id="focusSel"></select>
+      </div>
+      <div class="chart-wrap"><svg id="chart" viewBox="0 0 900 440" role="img" aria-label="Loan payoff chart"></svg></div>
+      <div class="readout" id="readout"></div>
+      <p class="note" id="viewNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-hd">
+        <h2>Summary</h2>
+        <button class="btn ghost" id="csvBtn">Export schedule</button>
+      </div>
+      <div class="tbl-scroll"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <p class="note">
+        Deltas compare each scenario against the first one in the list. Payments assume monthly compounding
+        and a payment applied on the last day of each month.
+      </p>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">AppADay 071 &middot; Payoff Ledger &middot; Not financial advice. Check the math before you act on it.</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  var COLORS = ['#17324B','#A33A2E','#9A6D18','#26645E','#6A3B57','#4C6B2F'];
+  var STORE = 'appaday071.v1';
+  var money = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+  var money2 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});
+
+  var state = {
+    view:'balance',
+    focus:0,
+    ret:7,
+    scenarios:[]
+  };
+
+  function defaults(){
+    return [
+      {id:id(), name:'30-year baseline', color:COLORS[0], P:350000, rate:6.75, years:30, xtype:'none', xamt:0, xmonth:12, open:false},
+      {id:id(), name:'$300 extra monthly', color:COLORS[1], P:350000, rate:6.75, years:30, xtype:'monthly', xamt:300, xmonth:12, open:false}
+    ];
+  }
+  function id(){ return 's'+Math.random().toString(36).slice(2,9); }
+
+  /* ---------------- math ---------------- */
+
+  function basePayment(P, rate, years){
+    var r = rate/100/12, n = Math.round(years*12);
+    if(n <= 0) return 0;
+    if(r === 0) return P/n;
+    return P * r / (1 - Math.pow(1+r, -n));
+  }
+
+  // Extra principal applied in a given month (1-indexed) for a scenario.
+  function extraFor(s, m, pay){
+    switch(s.xtype){
+      case 'monthly': return s.xamt;
+      case 'onetime': return m === Math.round(s.xmonth) ? s.xamt : 0;
+      case 'annual':  return m % 12 === (Math.round(s.xmonth) % 12) ? s.xamt : 0;
+      case 'biweekly': return pay/12;
+      default: return 0;
+    }
+  }
+
+  // Full amortization schedule. Returns rows plus totals.
+  function schedule(s, forceNoExtra){
+    var r = s.rate/100/12;
+    var n = Math.round(s.years*12);
+    var pay = basePayment(s.P, s.rate, s.years);
+    var bal = s.P, cum = 0, rows = [], cap = Math.max(n*2, 720);
+    var negam = (r > 0 && pay <= s.P*r + 1e-9);
+    if(negam || !(s.P > 0) || !(n > 0)){
+      return {rows:[{m:0,bal:s.P||0,int:0,prin:0,extra:0,cum:0}], pay:pay, months:0, total:0, negam:true, base:pay};
+    }
+    for(var m=1; m<=cap && bal > 0.004; m++){
+      var interest = bal * r;
+      var prin = Math.min(pay - interest, bal);
+      var xt = forceNoExtra ? 0 : Math.min(extraFor(s, m, pay), Math.max(bal - prin, 0));
+      bal = bal - prin - xt;
+      cum += interest;
+      rows.push({m:m, bal:Math.max(bal,0), int:interest, prin:prin, extra:xt, cum:cum});
+    }
+    return {rows:rows, pay:pay, months:rows.length, total:cum, negam:false, base:pay};
+  }
+
+  // Month where principal portion of the base payment first exceeds interest.
+  function crossover(sch){
+    for(var i=0;i<sch.rows.length;i++) if(sch.rows[i].prin > sch.rows[i].int) return sch.rows[i].m;
+    return null;
+  }
+
+  /* Pay-down vs. invest, holding monthly cash outlay identical in both paths.
+     Path A: extra goes to the loan; once the loan is gone, the whole outlay is invested.
+     Path B: extra is invested from day one; the loan runs its full original term.
+     Net position = investments minus remaining loan balance. */
+  function opportunity(s, annualReturn){
+    var r = s.rate/100/12;
+    var n = Math.round(s.years*12);
+    var pay = basePayment(s.P, s.rate, s.years);
+    var ir = Math.pow(1 + annualReturn/100, 1/12) - 1;
+    var A = {bal:s.P, inv:0}, B = {bal:s.P, inv:0};
+    var series = [], cross = null, hasExtra = false;
+    for(var m=1; m<=n; m++){
+      var xt = extraFor(s, m, pay);
+      if(xt > 0) hasExtra = true;
+      var outlay = pay + xt;
+
+      // Path A -- pay the loan down fast
+      A.inv *= (1+ir);
+      if(A.bal > 0.004){
+        var iA = A.bal * r;
+        var pA = Math.min(pay - iA, A.bal);
+        var xA = Math.min(xt, Math.max(A.bal - pA, 0));
+        A.bal = Math.max(A.bal - pA - xA, 0);
+        A.inv += Math.max(outlay - iA - pA - xA, 0);
+      } else {
+        A.inv += outlay;
+      }
+
+      // Path B -- pay the loan on schedule, invest the difference
+      B.inv *= (1+ir);
+      if(B.bal > 0.004){
+        var iB = B.bal * r;
+        var pB = Math.min(pay - iB, B.bal);
+        B.bal = Math.max(B.bal - pB, 0);
+        B.inv += Math.max(outlay - iB - pB, 0);
+      } else {
+        B.inv += outlay;
+      }
+
+      var netA = A.inv - A.bal, netB = B.inv - B.bal;
+      if(cross === null && m > 1 && netA >= netB) cross = m;
+      series.push({m:m, a:netA, b:netB});
+    }
+    return {series:series, cross:cross, hasExtra:hasExtra,
+            finalA:series.length?series[series.length-1].a:0,
+            finalB:series.length?series[series.length-1].b:0};
+  }
+
+  /* ---------------- persistence ---------------- */
+
+  function save(){
+    try{
+      localStorage.setItem(STORE, JSON.stringify({scenarios:state.scenarios, ret:state.ret, view:state.view}));
+    }catch(e){/* sandboxed frame or private mode -- run in memory */}
+  }
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORE);
+      if(!raw) return false;
+      var d = JSON.parse(raw);
+      if(!d || !Array.isArray(d.scenarios) || !d.scenarios.length) return false;
+      state.scenarios = d.scenarios;
+      if(typeof d.ret === 'number') state.ret = d.ret;
+      if(d.view) state.view = d.view;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* ---------------- scenario panel ---------------- */
+
+  var scnList = document.getElementById('scnList');
+  var scnCount = document.getElementById('scnCount');
+
+  var XTYPES = [
+    ['none','No extra payments'],
+    ['monthly','Extra every month'],
+    ['onetime','One-time lump sum'],
+    ['annual','Lump sum every year'],
+    ['biweekly','Biweekly half-payments']
+  ];
+
+  function summaryLine(s){
+    var sch = schedule(s);
+    if(sch.negam) return 'payment too small';
+    return money.format(sch.pay) + '/mo \u00b7 ' + termText(sch.months);
+  }
+  function termText(months){
+    if(!months) return '\u2014';
+    var y = Math.floor(months/12), m = months%12;
+    return (y? y+'y ':'') + (m? m+'m' : (y?'':'0m'));
+  }
+
+  function renderScenarios(){
+    scnList.textContent = '';
+    state.scenarios.forEach(function(s, i){
+      var card = document.createElement('div');
+      card.className = 'scn' + (s.open?' open':'');
+      card.style.setProperty('--sc', s.color);
+
+      var top = document.createElement('div');
+      top.className = 'scn-top';
+      top.innerHTML = '<span class="swatch"></span>';
+
+      var nm = document.createElement('input');
+      nm.className = 'scn-name'; nm.type = 'text'; nm.value = s.name; nm.setAttribute('aria-label','Scenario name');
+      nm.addEventListener('input', function(){ s.name = nm.value; renderAll(false); });
+      nm.addEventListener('click', function(e){ e.stopPropagation(); });
+      top.appendChild(nm);
+
+      var sub = document.createElement('span');
+      sub.className = 'scn-sub'; sub.textContent = summaryLine(s);
+      top.appendChild(sub);
+
+      var chev = document.createElement('span');
+      chev.className = 'chev'; chev.textContent = s.open ? '\u25BE' : '\u25B8';
+      top.appendChild(chev);
+      top.addEventListener('click', function(){ s.open = !s.open; renderScenarios(); });
+      card.appendChild(top);
+
+      var body = document.createElement('div');
+      body.className = 'scn-body';
+
+      body.appendChild(numField('Loan amount', s.P, 0, 5000000, 1000, function(v){ s.P = v; renderAll(false); }));
+      var r2 = document.createElement('div'); r2.className = 'row2';
+      r2.appendChild(numField('Rate %', s.rate, 0, 30, 0.125, function(v){ s.rate = v; renderAll(false); }));
+      r2.appendChild(numField('Term (years)', s.years, 1, 50, 1, function(v){ s.years = v; renderAll(false); }));
+      body.appendChild(r2);
+
+      var xf = document.createElement('div'); xf.className = 'fld';
+      var xl = document.createElement('label'); xl.textContent = 'Extra payment strategy';
+      var sel = document.createElement('select');
+      XTYPES.forEach(function(t){
+        var o = document.createElement('option'); o.value = t[0]; o.textContent = t[1];
+        if(s.xtype === t[0]) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function(){ s.xtype = sel.value; renderScenarios(); renderAll(); });
+      xf.appendChild(xl); xf.appendChild(sel); body.appendChild(xf);
+
+      if(s.xtype === 'monthly'){
+        body.appendChild(numField('Extra per month', s.xamt, 0, 100000, 25, function(v){ s.xamt = v; renderAll(false); }));
+      } else if(s.xtype === 'onetime'){
+        var g = document.createElement('div'); g.className = 'row2';
+        g.appendChild(numField('Lump sum', s.xamt, 0, 5000000, 500, function(v){ s.xamt = v; renderAll(false); }));
+        g.appendChild(numField('Applied at month', s.xmonth, 1, 600, 1, function(v){ s.xmonth = v; renderAll(false); }));
+        body.appendChild(g);
+      } else if(s.xtype === 'annual'){
+        var g2 = document.createElement('div'); g2.className = 'row2';
+        g2.appendChild(numField('Lump sum', s.xamt, 0, 5000000, 500, function(v){ s.xamt = v; renderAll(false); }));
+        g2.appendChild(numField('Month of year', s.xmonth, 1, 12, 1, function(v){ s.xmonth = v; renderAll(false); }));
+        body.appendChild(g2);
+      } else if(s.xtype === 'biweekly'){
+        var p = document.createElement('p');
+        p.className = 'note'; p.style.padding = '10px 0 0'; p.style.border = 'none';
+        p.textContent = 'Half the payment every two weeks lands 26 half-payments a year, which is one extra full payment. Modeled here as ' + money.format(basePayment(s.P,s.rate,s.years)/12) + ' of extra principal each month.';
+        body.appendChild(p);
+      }
+
+      var w = document.createElement('p');
+      w.className = 'warn' + (schedule(s).negam ? ' on' : '');
+      w.textContent = 'This loan never pays off: the monthly payment does not cover the interest. Raise the payment, drop the rate, or shorten the term.';
+      body.appendChild(w);
+
+      var acts = document.createElement('div'); acts.className = 'scn-acts';
+      var dup = document.createElement('button'); dup.className = 'btn ghost'; dup.textContent = 'Duplicate';
+      dup.addEventListener('click', function(){
+        var c = JSON.parse(JSON.stringify(s));
+        c.id = id(); c.name = s.name + ' (copy)'; c.color = nextColor(); c.open = true;
+        state.scenarios.splice(i+1, 0, c); renderAll();
+      });
+      acts.appendChild(dup);
+      var del = document.createElement('button'); del.className = 'btn danger'; del.textContent = 'Delete';
+      del.disabled = state.scenarios.length < 2;
+      del.addEventListener('click', function(){
+        state.scenarios.splice(i,1);
+        if(state.focus >= state.scenarios.length) state.focus = 0;
+        renderAll();
+      });
+      acts.appendChild(del);
+      body.appendChild(acts);
+
+      card.appendChild(body);
+      scnList.appendChild(card);
+    });
+    scnCount.textContent = state.scenarios.length + ' of 6';
+    document.getElementById('addBtn').disabled = state.scenarios.length >= 6;
+  }
+
+  function nextColor(){
+    var used = state.scenarios.map(function(s){ return s.color; });
+    for(var i=0;i<COLORS.length;i++) if(used.indexOf(COLORS[i]) === -1) return COLORS[i];
+    return COLORS[used.length % COLORS.length];
+  }
+
+  function numField(label, value, min, max, step, onChange){
+    var f = document.createElement('div'); f.className = 'fld';
+    var l = document.createElement('label'); l.textContent = label;
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.value = value; inp.min = min; inp.max = max; inp.step = step;
+    inp.inputMode = 'decimal';
+    inp.addEventListener('input', function(){
+      var v = parseFloat(inp.value);
+      if(isNaN(v)) return;
+      v = Math.min(Math.max(v, min), max);
+      onChange(v);
+    });
+    f.appendChild(l); f.appendChild(inp);
+    return f;
+  }
+
+  /* ---------------- chart ---------------- */
+
+  var svgEl = document.getElementById('chart');
+  var W = 900, H = 440, ML = 74, MR = 22, MT = 18, MB = 42;
+  var PW = W-ML-MR, PH = H-MT-MB;
+  var lastPlot = null;
+
+  function niceMax(v){
+    if(v <= 0) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var steps = [1,1.25,1.5,2,2.5,3,4,5,6,8,10];
+    for(var i=0;i<steps.length;i++){ if(steps[i]*mag >= v) return steps[i]*mag; }
+    return 10*mag;
+  }
+  function niceMin(v){
+    if(v >= 0) return 0;
+    return -niceMax(-v);
+  }
+  function fmtAxis(v){
+    var a = Math.abs(v);
+    var sign = v < 0 ? '\u2212' : '';
+    if(a >= 1e6) return sign+'$'+(a/1e6).toFixed(a/1e6 >= 10 ? 0 : 1)+'M';
+    if(a >= 1e3) return sign+'$'+Math.round(a/1e3)+'k';
+    return sign+'$'+Math.round(a);
+  }
+  function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function buildPlot(){
+    var view = state.view;
+    var series = [], yMin = 0, yMax = 0, xMax = 1, note = '', marks = [];
+
+    if(view === 'balance' || view === 'interest'){
+      state.scenarios.forEach(function(s){
+        var sch = schedule(s);
+        if(sch.negam) return;
+        var pts = [{x:0, y: view==='balance' ? s.P : 0}];
+        sch.rows.forEach(function(r){ pts.push({x:r.m, y: view==='balance' ? r.bal : r.cum}); });
+        series.push({name:s.name, color:s.color, pts:pts});
+        xMax = Math.max(xMax, sch.months);
+        yMax = Math.max(yMax, view==='balance' ? s.P : sch.total);
+      });
+      note = view === 'balance'
+        ? 'Every scenario plotted together. The gap between two curves at any month is the difference in what you still owe; where a curve hits zero is the payoff date.'
+        : 'Cumulative interest paid to date. These curves never come back down \u2014 the flat part is where the loan is gone and the meter has stopped.';
+    }
+
+    if(view === 'split'){
+      var s = state.scenarios[state.focus];
+      var sch = schedule(s);
+      if(!sch.negam){
+        var iPts = [], pPts = [], xPts = [];
+        sch.rows.forEach(function(r){
+          iPts.push({x:r.m, y:r.int});
+          pPts.push({x:r.m, y:r.int + r.prin});
+          xPts.push({x:r.m, y:r.int + r.prin + r.extra});
+          yMax = Math.max(yMax, r.int + r.prin + r.extra);
+        });
+        series.push({name:'Interest', color:'#A33A2E', pts:iPts, area:true, from:null});
+        series.push({name:'Principal', color:'#17324B', pts:pPts, area:true, from:iPts});
+        if(xPts.some(function(p,i){ return p.y > pPts[i].y + 0.01; }))
+          series.push({name:'Extra principal', color:'#9A6D18', pts:xPts, area:true, from:pPts});
+        xMax = sch.months;
+        var cm = crossover(sch);
+        if(cm) marks.push({x:cm, label:'Principal overtakes interest \u00b7 month '+cm});
+        note = 'Where each monthly payment actually goes. The marked month is the first one where more of the payment builds equity than pays the bank; on a long note at a high rate it arrives much later than people expect.';
+      }
+    }
+
+    if(view === 'invest'){
+      var sf = state.scenarios[state.focus];
+      var op = opportunity(sf, state.ret);
+      var aPts = [], bPts = [];
+      op.series.forEach(function(r){
+        aPts.push({x:r.m, y:r.a}); bPts.push({x:r.m, y:r.b});
+        yMax = Math.max(yMax, r.a, r.b); yMin = Math.min(yMin, r.a, r.b);
+        xMax = Math.max(xMax, r.m);
+      });
+      series.push({name:'Pay the loan down', color:'#17324B', pts:aPts});
+      series.push({name:'Invest the extra instead', color:'#26645E', pts:bPts});
+      if(op.cross) marks.push({x:op.cross, label:'Paying down pulls ahead \u00b7 month '+op.cross});
+      if(!op.hasExtra){
+        note = 'This scenario has no extra payments, so both paths are the same loan and the lines sit on top of each other. Give it an extra payment strategy and the two will separate.';
+      } else {
+        var diff = op.finalA - op.finalB;
+        note = 'Net position, meaning investments minus what you still owe, with the same dollars leaving your account every month in both paths. At '
+          + state.ret.toFixed(2) + '% assumed return, paying down finishes '
+          + (diff >= 0 ? money.format(diff) + ' ahead of' : money.format(-diff) + ' behind')
+          + ' investing the difference. Taxes and the mortgage interest deduction are not modeled.';
+      }
+    }
+
+    if(!series.length) note = note || 'No scenario is currently plottable. Check the payment against the interest.';
+    lastPlot = {series:series, xMax:Math.max(xMax,1), yMax:niceMax(yMax), yMin:niceMin(yMin), marks:marks, note:note};
+    return lastPlot;
+  }
+
+  function drawChart(){
+    var p = buildPlot();
+    var xs = function(m){ return ML + (m / p.xMax) * PW; };
+    var ys = function(v){ return MT + PH - ((v - p.yMin) / (p.yMax - p.yMin || 1)) * PH; };
+    var out = [];
+
+    // horizontal ledger rules + y labels
+    var ticks = 6;
+    for(var i=0;i<=ticks;i++){
+      var v = p.yMin + (p.yMax - p.yMin) * i/ticks;
+      var y = ys(v);
+      out.push('<line x1="'+ML+'" y1="'+y.toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y.toFixed(1)+'" stroke="'+(Math.abs(v)<1e-6?'#8695A0':'#CBD7C4')+'" stroke-width="1"/>');
+      out.push('<text x="'+(ML-9)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5A6B78">'+fmtAxis(v)+'</text>');
+    }
+    // x ticks by year
+    var years = Math.ceil(p.xMax/12);
+    var stepY = years <= 12 ? 1 : (years <= 24 ? 2 : 5);
+    for(var yy=0; yy<=years; yy+=stepY){
+      var x = xs(yy*12);
+      if(x > W-MR+1) break;
+      out.push('<line x1="'+x.toFixed(1)+'" y1="'+MT+'" x2="'+x.toFixed(1)+'" y2="'+(MT+PH)+'" stroke="#DDE5D6" stroke-width="1"/>');
+      out.push('<text x="'+x.toFixed(1)+'" y="'+(H-16)+'" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5A6B78">'+yy+'</text>');
+    }
+    out.push('<text x="'+(ML+PW/2)+'" y="'+(H-2)+'" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="1.4" fill="#8695A0">YEARS</text>');
+    // red margin rule, ledger-style
+    out.push('<line x1="'+ML+'" y1="'+MT+'" x2="'+ML+'" y2="'+(MT+PH)+'" stroke="#C08A84" stroke-width="1.5"/>');
+
+    // areas first
+    p.series.forEach(function(sr){
+      if(!sr.area) return;
+      var d = 'M '+xs(sr.pts[0].x).toFixed(1)+' '+ys(sr.pts[0].y).toFixed(1);
+      sr.pts.forEach(function(pt){ d += ' L '+xs(pt.x).toFixed(1)+' '+ys(pt.y).toFixed(1); });
+      if(sr.from){
+        for(var i=sr.from.length-1;i>=0;i--) d += ' L '+xs(sr.from[i].x).toFixed(1)+' '+ys(sr.from[i].y).toFixed(1);
+      } else {
+        d += ' L '+xs(sr.pts[sr.pts.length-1].x).toFixed(1)+' '+ys(0).toFixed(1);
+        d += ' L '+xs(sr.pts[0].x).toFixed(1)+' '+ys(0).toFixed(1);
+      }
+      d += ' Z';
+      out.push('<path d="'+d+'" fill="'+sr.color+'" fill-opacity="0.55" stroke="'+sr.color+'" stroke-width="1"/>');
+    });
+    // lines
+    p.series.forEach(function(sr){
+      if(sr.area) return;
+      var d = '';
+      sr.pts.forEach(function(pt,i){ d += (i?' L ':'M ')+xs(pt.x).toFixed(1)+' '+ys(pt.y).toFixed(1); });
+      out.push('<path d="'+d+'" fill="none" stroke="'+sr.color+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>');
+      var last = sr.pts[sr.pts.length-1];
+      out.push('<circle cx="'+xs(last.x).toFixed(1)+'" cy="'+ys(last.y).toFixed(1)+'" r="3" fill="'+sr.color+'"/>');
+    });
+    // marks
+    p.marks.forEach(function(mk){
+      var x = xs(mk.x);
+      out.push('<line x1="'+x.toFixed(1)+'" y1="'+MT+'" x2="'+x.toFixed(1)+'" y2="'+(MT+PH)+'" stroke="#A33A2E" stroke-width="1.5" stroke-dasharray="5 4"/>');
+      var anchor = x > W*0.62 ? 'end' : 'start';
+      var tx = anchor === 'end' ? x-7 : x+7;
+      out.push('<text x="'+tx.toFixed(1)+'" y="'+(MT+14)+'" text-anchor="'+anchor+'" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="#A33A2E">'+esc(mk.label)+'</text>');
+    });
+    // hover guide
+    out.push('<g id="guide" style="display:none"><line id="guideLine" y1="'+MT+'" y2="'+(MT+PH)+'" stroke="#1B2A38" stroke-width="1" stroke-dasharray="3 3"/></g>');
+    out.push('<rect id="hit" x="'+ML+'" y="'+MT+'" width="'+PW+'" height="'+PH+'" fill="transparent" style="cursor:crosshair"/>');
+
+    svgEl.innerHTML = out.join('');
+    document.getElementById('viewNote').textContent = p.note;
+    bindHover();
+    showReadout(null);
+  }
+
+  function bindHover(){
+    var hit = document.getElementById('hit');
+    if(!hit) return;
+    function at(evt){
+      var r = svgEl.getBoundingClientRect();
+      var cx = (evt.touches ? evt.touches[0].clientX : evt.clientX);
+      var xUser = (cx - r.left) / r.width * W;
+      var m = Math.round((xUser - ML) / (PW || 1) * lastPlot.xMax);
+      m = Math.min(Math.max(m, 0), lastPlot.xMax);
+      var g = document.getElementById('guide'), gl = document.getElementById('guideLine');
+      var gx = ML + (m/lastPlot.xMax)*PW;
+      gl.setAttribute('x1', gx); gl.setAttribute('x2', gx);
+      g.style.display = '';
+      showReadout(m);
+    }
+    hit.addEventListener('mousemove', at);
+    hit.addEventListener('touchstart', function(e){ at(e); }, {passive:true});
+    hit.addEventListener('touchmove', function(e){ at(e); }, {passive:true});
+    hit.addEventListener('mouseleave', function(){
+      var g = document.getElementById('guide'); if(g) g.style.display = 'none';
+      showReadout(null);
+    });
+  }
+
+  function valueAt(sr, m){
+    var best = null;
+    for(var i=0;i<sr.pts.length;i++){ if(sr.pts[i].x <= m) best = sr.pts[i]; else break; }
+    if(!best) return sr.pts[0] ? sr.pts[0].y : 0;
+    if(best.x < m && sr.pts[sr.pts.length-1].x < m){
+      // past payoff: balance-style series hold at their last value
+      return best.y;
+    }
+    return best.y;
+  }
+
+  function showReadout(m){
+    var ro = document.getElementById('readout');
+    if(m === null || !lastPlot || !lastPlot.series.length){
+      ro.innerHTML = '<span>Hover the chart to read any month.</span>';
+      return;
+    }
+    var y = Math.floor(m/12), mo = m%12;
+    var parts = ['<b>Month '+m+'</b> <span style="color:var(--ink-faint)">('+y+'y '+mo+'m)</span>'];
+    lastPlot.series.forEach(function(sr){
+      parts.push('<span><span class="dot" style="background:'+sr.color+'"></span>'+esc(sr.name)+' <b>'+money.format(valueAt(sr,m))+'</b></span>');
+    });
+    ro.innerHTML = parts.join('');
+  }
+
+  /* ---------------- summary table ---------------- */
+
+  function renderTable(){
+    var thead = document.querySelector('#tbl thead');
+    var tbody = document.querySelector('#tbl tbody');
+    thead.innerHTML = '<tr><th>Scenario</th><th>Payment</th><th>Payoff</th><th>Interest</th><th>Interest saved</th><th>Time saved</th></tr>';
+    tbody.textContent = '';
+    var base = state.scenarios[0] ? schedule(state.scenarios[0]) : null;
+    state.scenarios.forEach(function(s, i){
+      var sch = schedule(s);
+      var tr = document.createElement('tr');
+      var extraTxt = s.xtype === 'none' ? '' : ' \u00b7 ' + XTYPES.filter(function(t){return t[0]===s.xtype;})[0][1].toLowerCase();
+      var cells = '<td class="name"><span class="swatch" style="background:'+s.color+'"></span>'+esc(s.name)+'</td>';
+      if(sch.negam){
+        cells += '<td colspan="5" style="text-align:left;color:var(--c2)">Payment does not cover interest \u2014 this loan never amortizes.</td>';
+      } else {
+        var dInt = base && !base.negam ? base.total - sch.total : 0;
+        var dMon = base && !base.negam ? base.months - sch.months : 0;
+        cells += '<td>'+money2.format(sch.pay + (s.xtype==='monthly'? s.xamt : s.xtype==='biweekly'? sch.pay/12 : 0))+'</td>';
+        cells += '<td>'+termText(sch.months)+'</td>';
+        cells += '<td>'+money.format(sch.total)+'</td>';
+        if(i === 0){
+          cells += '<td class="base">baseline</td><td class="base">baseline</td>';
+        } else {
+          cells += '<td class="delta '+(dInt>0?'good':dInt<0?'bad':'')+'">'+(dInt>0?'+':'')+money.format(dInt)+'</td>';
+          cells += '<td class="delta '+(dMon>0?'good':dMon<0?'bad':'')+'">'+(dMon>0?'+':'')+termText(Math.abs(dMon))+'</td>';
+        }
+      }
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* ---------------- focus picker + views ---------------- */
+
+  var focusRow = document.getElementById('focusRow');
+  var focusSel = document.getElementById('focusSel');
+
+  function renderFocus(){
+    var needs = (state.view === 'split' || state.view === 'invest');
+    focusRow.hidden = !needs;
+    if(!needs) return;
+    if(state.focus >= state.scenarios.length) state.focus = 0;
+    focusSel.textContent = '';
+    state.scenarios.forEach(function(s,i){
+      var o = document.createElement('option');
+      o.value = i; o.textContent = s.name;
+      if(i === state.focus) o.selected = true;
+      focusSel.appendChild(o);
+    });
+  }
+  focusSel.addEventListener('change', function(){
+    state.focus = parseInt(focusSel.value,10) || 0;
+    drawChart();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.view-tab'), function(tab){
+    tab.addEventListener('click', function(){
+      state.view = tab.dataset.view;
+      Array.prototype.forEach.call(document.querySelectorAll('.view-tab'), function(t){
+        t.setAttribute('aria-selected', String(t === tab));
+      });
+      renderFocus(); drawChart(); save();
+    });
+  });
+
+  /* ---------------- CSV ---------------- */
+
+  document.getElementById('csvBtn').addEventListener('click', function(){
+    var s = state.scenarios[state.focus] || state.scenarios[0];
+    var sch = schedule(s);
+    var lines = ['month,payment,interest,principal,extra_principal,balance,cumulative_interest'];
+    sch.rows.forEach(function(r){
+      lines.push([r.m, (r.int+r.prin+r.extra).toFixed(2), r.int.toFixed(2), r.prin.toFixed(2),
+                  r.extra.toFixed(2), r.bal.toFixed(2), r.cum.toFixed(2)].join(','));
+    });
+    var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = s.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') + '-schedule.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 0);
+  });
+
+  /* ---------------- wiring ---------------- */
+
+  var retInput = document.getElementById('retInput'), retVal = document.getElementById('retVal');
+  retInput.addEventListener('input', function(){
+    state.ret = parseFloat(retInput.value);
+    retVal.textContent = state.ret.toFixed(2)+'%';
+    if(state.view === 'invest') drawChart();
+    save();
+  });
+
+  document.getElementById('addBtn').addEventListener('click', function(){
+    if(state.scenarios.length >= 6) return;
+    var last = state.scenarios[state.scenarios.length-1] || defaults()[0];
+    state.scenarios.push({
+      id:id(), name:'Scenario '+(state.scenarios.length+1), color:nextColor(),
+      P:last.P, rate:last.rate, years:last.years, xtype:'none', xamt:0, xmonth:12, open:true
+    });
+    renderAll();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    state.scenarios = defaults(); state.focus = 0; renderAll();
+  });
+
+  var raf = null;
+  function renderAll(full){
+    renderTable();
+    renderFocus();
+    if(full !== false) renderScenarios();
+    else {
+      // name edits only: refresh subtitles without stealing focus from the input
+      Array.prototype.forEach.call(document.querySelectorAll('.scn'), function(card, i){
+        var s = state.scenarios[i];
+        if(!s) return;
+        var sub = card.querySelector('.scn-sub');
+        if(sub) sub.textContent = summaryLine(s);
+        var w = card.querySelector('.warn');
+        if(w) w.className = 'warn' + (schedule(s).negam ? ' on' : '');
+      });
+    }
+    if(raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(function(){ drawChart(); save(); });
+  }
+
+  if(!load()) state.scenarios = defaults();
+  retInput.value = state.ret; retVal.textContent = state.ret.toFixed(2)+'%';
+  Array.prototype.forEach.call(document.querySelectorAll('.view-tab'), function(t){
+    t.setAttribute('aria-selected', String(t.dataset.view === state.view));
+  });
+  renderAll();
+})();
+</script>
+</body>
+</html>
